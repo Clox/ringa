@@ -2,7 +2,7 @@
 
 This repo contains three pieces:
 
-- `chrome-extension/`: Chrome extension popup that sends messages.
+- `chrome-extension/`: Chrome extension that sends dial requests.
 - `terminal-host/`: Python terminal app that receives browser messages and forwards them.
 - `android-receiver/`: Android app that runs a foreground listener service on LAN, displays events, and advertises itself via mDNS.
 
@@ -67,14 +67,13 @@ python3 terminal-host/server.py \
 ## 4) Send from Chrome
 
 1. Click the extension icon in Chrome.
-2. For a regular text event, enter a message and click `Send to terminal`.
-3. For a dial event, enter a phone number and click `Send dial request`.
-4. You can also highlight a phone number in a web page, right-click, and choose `Dial via Ringa`.
+2. Enter a phone number and click `Send dial request`.
+3. You can also highlight a phone number in a web page, right-click, and choose `Dial via Ringa`.
 
 You will see:
 
 - Terminal app prints the incoming browser payload and forwarding status.
-- Android app appends the forwarded message to its message log.
+- Android app appends the forwarded event to its log.
 - For dial events:
   - if app UI is visible, Android app opens the dialer directly.
   - if app UI is backgrounded, Android posts a high-priority "Tap to dial" notification (Android background-launch policy).
@@ -111,16 +110,6 @@ cd /home/oscar/projects/ringa
 ```
 
 ## JSON payloads
-
-Regular message payload:
-
-```json
-{
-  "source": "chrome-extension",
-  "sent_at": "2026-03-09T18:00:00.000Z",
-  "message": "hello from browser"
-}
-```
 
 Dial request payload:
 
@@ -174,5 +163,5 @@ Dial request payload from Linux `tel:` handler (`install.sh` option):
 ```bash
 curl -X POST http://127.0.0.1:8765/message \
   -H "Content-Type: application/json" \
-  -d '{"message":"hello from curl","source":"cli"}'
+  -d '{"source":"cli","request_type":"dial","dial_number":"0462769200"}'
 ```

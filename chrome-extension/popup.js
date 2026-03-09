@@ -1,9 +1,7 @@
 const ENDPOINT = "http://127.0.0.1:8765/message";
 
-const messageInput = document.getElementById("message");
 const phoneInput = document.getElementById("phoneNumber");
 const statusEl = document.getElementById("status");
-const sendBtn = document.getElementById("sendBtn");
 const sendDialBtn = document.getElementById("sendDialBtn");
 
 function setStatus(text, ok) {
@@ -12,7 +10,6 @@ function setStatus(text, ok) {
 }
 
 function setButtonsDisabled(disabled) {
-  sendBtn.disabled = disabled;
   sendDialBtn.disabled = disabled;
 }
 
@@ -47,22 +44,6 @@ async function postPayload(payload, successText) {
   }
 }
 
-async function sendMessage() {
-  const message = messageInput.value.trim();
-  if (!message) {
-    setStatus("Enter a message first.", false);
-    return;
-  }
-
-  const payload = {
-    ...basePayload(),
-    message
-  };
-
-  await postPayload(payload, "Message sent.");
-  messageInput.value = "";
-}
-
 async function sendDialRequest() {
   const dialNumber = phoneInput.value.trim();
   if (!dialNumber) {
@@ -79,14 +60,7 @@ async function sendDialRequest() {
   await postPayload(payload, "Dial request sent.");
 }
 
-sendBtn.addEventListener("click", sendMessage);
 sendDialBtn.addEventListener("click", sendDialRequest);
-
-messageInput.addEventListener("keydown", (event) => {
-  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-    sendMessage();
-  }
-});
 
 phoneInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {

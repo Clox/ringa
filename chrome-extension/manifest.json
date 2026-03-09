@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Terminal Sender PoC",
+  "name": "Ringa",
   "version": "0.1.0",
-  "description": "Send a message from Chrome to a local terminal program.",
+  "description": "Send dial requests from Chrome to the local Ringa host.",
   "permissions": [
     "contextMenus"
   ],
   "action": {
-    "default_title": "Terminal Sender",
+    "default_title": "Ringa",
     "default_popup": "popup.html"
   },
   "background": {
