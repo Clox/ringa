@@ -48,6 +48,15 @@ textarea {
   color: var(--text);
 }
 
+input[type="text"] {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+
 button {
   margin-top: 10px;
   width: 100%;
@@ -62,6 +71,14 @@ button {
 
 button:hover {
   background: var(--accent-hover);
+}
+
+button.secondary {
+  background: #134e4a;
+}
+
+button.secondary:hover {
+  background: #0f3d3a;
 }
 
 #status {

@@ -61,16 +61,40 @@ python3 terminal-host/server.py \
 3. Click `Load unpacked`
 4. Select `/home/oscar/projects/ringa/chrome-extension`
 
-## 4) Send a message
+## 4) Send from Chrome
 
 1. Click the extension icon in Chrome.
-2. Enter a message.
-3. Click `Send to terminal`.
+2. For a regular text event, enter a message and click `Send to terminal`.
+3. For a dial event, enter a phone number and click `Send dial request`.
 
 You will see:
 
 - Terminal app prints the incoming browser payload and forwarding status.
 - Android app appends the forwarded message to its message log.
+- For dial events, Android app opens the default dialer with the provided number.
+
+## JSON payloads
+
+Regular message payload:
+
+```json
+{
+  "source": "chrome-extension",
+  "sent_at": "2026-03-09T18:00:00.000Z",
+  "message": "hello from browser"
+}
+```
+
+Dial request payload:
+
+```json
+{
+  "source": "chrome-extension",
+  "sent_at": "2026-03-09T18:00:00.000Z",
+  "request_type": "dial",
+  "dial_number": "+15551234567"
+}
+```
 
 ## Terminal host flags
 

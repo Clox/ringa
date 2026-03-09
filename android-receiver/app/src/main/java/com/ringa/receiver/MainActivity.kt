@@ -1,7 +1,10 @@
 package com.ringa.receiver
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.graphics.Typeface
+import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Bundle
@@ -126,8 +129,13 @@ class MainActivity : Activity() {
         val endpoint = "http://$localIp:$listenPort/message"
         endpointText.text = "Endpoint: $endpoint\nmDNS: $nsdServiceName.$nsdServiceType"
 
-        val newServer = AndroidMessageServer(listenPort) { line ->
-            runOnUiThread { prependLog(line) }
+        val newServer = AndroidMessageServer(listenPort) { line, dialNumber ->
+            runOnUiThread {
+                prependLog(line)
+                if (!dialNumber.isNullOrBlank()) {
+                    openDialer(dialNumber)
+                }
+            }
         }
 
         try {
@@ -231,11 +239,30 @@ class MainActivity : Activity() {
             nsdRegistrationListener = null
         }
     }
+
+    private fun openDialer(rawNumber: String) {
+        val number = rawNumber.trim()
+        if (number.isEmpty()) {
+            return
+        }
+
+        val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+            data = Uri.parse("tel:${Uri.encode(number)}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        try {
+            startActivity(dialIntent)
+            prependLog("[${nowString()}] Opened dialer with: $number")
+        } catch (_: ActivityNotFoundException) {
+            prependLog("[${nowString()}] No dialer app found for: $number")
+        }
+    }
 }
 
 class AndroidMessageServer(
     port: Int,
-    private val onMessageLine: (String) -> Unit,
+    private val onMessageLine: (String, String?) -> Unit,
 ) : NanoHTTPD("0.0.0.0", port) {
 
     override fun serve(session: IHTTPSession): Response {
@@ -259,10 +286,11 @@ class AndroidMessageServer(
             session.parseBody(files)
             val rawBody = files["postData"] ?: "{}"
             val json = JSONObject(rawBody)
-            val message = json.optString("message", rawBody)
             val source = json.optString("source", "terminal-host")
+            val dialNumber = extractDialNumber(json)
+            val message = extractDisplayMessage(json, rawBody, dialNumber)
 
-            onMessageLine("[${nowString()}] $source: $message")
+            onMessageLine("[${nowString()}] $source: $message", dialNumber)
             jsonResponse(Response.Status.OK, """{"ok":true}""")
         } catch (e: Exception) {
             jsonResponse(
@@ -278,6 +306,39 @@ class AndroidMessageServer(
             addHeader("Access-Control-Allow-Headers", "Content-Type")
             addHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
         }
+    }
+
+    private fun extractDialNumber(json: JSONObject): String? {
+        val topLevelNumber = json.optString("dial_number", "").trim()
+        if (topLevelNumber.isNotEmpty()) {
+            return topLevelNumber
+        }
+
+        val browserPayload = json.optJSONObject("browser_payload") ?: return null
+        val nestedNumber = browserPayload.optString("dial_number", "").trim()
+        if (nestedNumber.isNotEmpty()) {
+            return nestedNumber
+        }
+        return null
+    }
+
+    private fun extractDisplayMessage(json: JSONObject, fallbackRaw: String, dialNumber: String?): String {
+        if (!dialNumber.isNullOrBlank()) {
+            return "dial request -> $dialNumber"
+        }
+
+        val message = json.optString("message", "").trim()
+        if (message.isNotEmpty()) {
+            return message
+        }
+
+        val browserPayload = json.optJSONObject("browser_payload")
+        val browserMessage = browserPayload?.optString("message", "")?.trim().orEmpty()
+        if (browserMessage.isNotEmpty()) {
+            return browserMessage
+        }
+
+        return fallbackRaw
     }
 }
 

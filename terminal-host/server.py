@@ -146,6 +146,8 @@ class MessageHandler(BaseHTTPRequestHandler):
         forwarded_payload: Dict[str, Any] = {
             "source": "terminal-host",
             "forwarded_at": now_iso(),
+            "request_type": payload.get("request_type"),
+            "dial_number": payload.get("dial_number"),
             "message": payload.get("message"),
             "browser_payload": payload,
         }
