@@ -91,8 +91,23 @@ cd /home/oscar/projects/ringa
 
 - register a custom `x-scheme-handler/tel` desktop entry in `~/.local/share/applications`
 - ask whether to set it as your default `tel:` handler
+- ask whether to install/update a `systemd --user` background service for the Ringa host (`terminal-host/server.py`)
 
 The handler forwards `tel:` links to `http://127.0.0.1:8765/message` as a dial payload.
+
+If you choose the service option, `install.sh` will also:
+
+- create/update `.venv` and install dependencies from `terminal-host/requirements.txt`
+- install/update `~/.config/systemd/user/ringa-host.service`
+- enable, start, and restart the service so code changes are applied
+- optionally try to enable `loginctl` lingering for reboot auto-start before login
+
+To apply updates after changing terminal-host code, rerun:
+
+```bash
+cd /home/oscar/projects/ringa
+./install.sh
+```
 
 ## JSON payloads
 
