@@ -78,6 +78,22 @@ You will see:
   - if app UI is visible, Android app opens the dialer directly.
   - if app UI is backgrounded, Android posts a high-priority "Tap to dial" notification (Android background-launch policy).
 
+## 5) Optional: Linux system `tel:` handler
+
+If you want desktop `tel:` links to route into the local terminal host:
+
+```bash
+cd /home/oscar/projects/ringa
+./install.sh
+```
+
+`install.sh` will:
+
+- register a custom `x-scheme-handler/tel` desktop entry in `~/.local/share/applications`
+- ask whether to set it as your default `tel:` handler
+
+The handler forwards `tel:` links to `http://127.0.0.1:8765/message` as a dial payload.
+
 ## JSON payloads
 
 Regular message payload:
@@ -98,6 +114,18 @@ Dial request payload:
   "sent_at": "2026-03-09T18:00:00.000Z",
   "request_type": "dial",
   "dial_number": "+15551234567"
+}
+```
+
+Dial request payload from Linux `tel:` handler (`install.sh` option):
+
+```json
+{
+  "source": "linux-tel-handler",
+  "sent_at": "2026-03-09T18:00:00.000Z",
+  "request_type": "dial",
+  "dial_number": "0462769200",
+  "trigger": "xdg_tel_handler"
 }
 ```
 
