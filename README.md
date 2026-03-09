@@ -4,7 +4,7 @@ This repo contains three pieces:
 
 - `chrome-extension/`: Chrome extension popup that sends messages.
 - `terminal-host/`: Python terminal app that receives browser messages and forwards them.
-- `android-receiver/`: Android app that listens on LAN, displays messages, and advertises itself via mDNS.
+- `android-receiver/`: Android app that runs a foreground listener service on LAN, displays events, and advertises itself via mDNS.
 
 ## Message flow
 
@@ -14,13 +14,16 @@ This repo contains three pieces:
 
 1. Open `/home/oscar/projects/ringa/android-receiver` in Android Studio.
 2. Let Gradle sync and install the app on your Android device.
-3. Launch the app and tap `Start server` (if not already running).
+3. Launch the app once. The listener auto-starts.
 
 Important:
 
 - Computer and phone must be on the same network.
-- Keep the Android app open while testing.
 - The app automatically advertises mDNS service type: `_ringa-receiver._tcp`.
+- The listener runs in a foreground service and keeps working when the app UI is backgrounded.
+- The app also attempts auto-start on device boot and on app update.
+- You will see a persistent notification while the listener is running.
+- On first launch, accept notification/battery prompts to reduce OEM background killing.
 
 ## 2) Terminal host forwarding modes
 
@@ -71,7 +74,9 @@ You will see:
 
 - Terminal app prints the incoming browser payload and forwarding status.
 - Android app appends the forwarded message to its message log.
-- For dial events, Android app opens the default dialer with the provided number.
+- For dial events:
+  - if app UI is visible, Android app opens the dialer directly.
+  - if app UI is backgrounded, Android posts a high-priority "Tap to dial" notification (Android background-launch policy).
 
 ## JSON payloads
 
