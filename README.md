@@ -69,6 +69,7 @@ python3 terminal-host/server.py \
 1. Click the extension icon in Chrome.
 2. For a regular text event, enter a message and click `Send to terminal`.
 3. For a dial event, enter a phone number and click `Send dial request`.
+4. You can also highlight a phone number in a web page, right-click, and choose `Dial via Ringa`.
 
 You will see:
 
@@ -129,6 +130,20 @@ Dial request payload:
   "sent_at": "2026-03-09T18:00:00.000Z",
   "request_type": "dial",
   "dial_number": "+15551234567"
+}
+```
+
+Dial request payload from context-menu selection:
+
+```json
+{
+  "source": "chrome-extension",
+  "sent_at": "2026-03-09T18:00:00.000Z",
+  "request_type": "dial",
+  "dial_number": "0462769200",
+  "trigger": "selection_context_menu",
+  "selection_raw": "046-276 92 00",
+  "page_url": "https://example.com/contact"
 }
 ```
 

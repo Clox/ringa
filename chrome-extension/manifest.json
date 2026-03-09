@@ -3,9 +3,15 @@
   "name": "Terminal Sender PoC",
   "version": "0.1.0",
   "description": "Send a message from Chrome to a local terminal program.",
+  "permissions": [
+    "contextMenus"
+  ],
   "action": {
     "default_title": "Terminal Sender",
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "host_permissions": [
     "http://127.0.0.1/*",
