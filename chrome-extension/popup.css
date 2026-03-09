@@ -1,0 +1,79 @@
+:root {
+  --bg: #f4efe7;
+  --panel: #fffaf2;
+  --text: #1d2129;
+  --muted: #667085;
+  --accent: #0c7a5d;
+  --accent-hover: #085f49;
+  --border: #d8cdbf;
+  --ok: #166534;
+  --err: #9f1239;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: "Segoe UI", "Noto Sans", "Liberation Sans", sans-serif;
+  background: linear-gradient(155deg, var(--bg) 0%, #efe4d3 100%);
+  color: var(--text);
+}
+
+main {
+  padding: 14px;
+}
+
+h1 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+  background: var(--panel);
+  color: var(--text);
+}
+
+button {
+  margin-top: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-hover);
+}
+
+#status {
+  min-height: 18px;
+  margin: 9px 0 0;
+  font-size: 12px;
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.err {
+  color: var(--err);
+}

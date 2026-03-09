@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+
+android-receiver/.gradle/
+android-receiver/app/build/
+android-receiver/local.properties
+
+terminal-host/__pycache__/
