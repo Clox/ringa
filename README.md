@@ -92,6 +92,8 @@ cd /home/oscar/projects/ringa
 - register a custom `x-scheme-handler/tel` desktop entry in `~/.local/share/applications`
 - ask whether to set it as your default `tel:` handler
 - ask whether to install/update a `systemd --user` background service for the Ringa host (`terminal-host/server.py`)
+- ask whether to build the Android debug APK
+- ask whether to install that APK to a connected device via adb
 
 The handler forwards `tel:` links to `http://127.0.0.1:8765/message` as a dial payload.
 
@@ -101,6 +103,10 @@ If you choose the service option, `install.sh` will also:
 - install/update `~/.config/systemd/user/ringa-host.service`
 - enable, start, and restart the service so code changes are applied
 - optionally try to enable `loginctl` lingering for reboot auto-start before login
+
+If you build Android from `install.sh`, the APK path is:
+
+- `/home/oscar/projects/ringa/android-receiver/app/build/outputs/apk/debug/app-debug.apk`
 
 To apply updates after changing terminal-host code, rerun:
 

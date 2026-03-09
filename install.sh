@@ -15,6 +15,9 @@ PREV_HANDLER_FILE="$CONFIG_DIR/previous-tel-handler"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 SERVICE_NAME="ringa-host.service"
 SERVICE_FILE="$SYSTEMD_USER_DIR/$SERVICE_NAME"
+ANDROID_DIR="$ROOT_DIR/android-receiver"
+GRADLEW_PATH="$ANDROID_DIR/gradlew"
+APK_PATH="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"
 
 if [[ ! -f "$HANDLER_SCRIPT" ]]; then
   echo "Missing handler script: $HANDLER_SCRIPT" >&2
@@ -70,7 +73,8 @@ else
 fi
 
 echo
-echo "Tip: run your Ringa host on 127.0.0.1:8765 before clicking tel: links."
+echo "Requirement: tel: links work only while the Ringa host is running on 127.0.0.1:8765."
+echo "You can start it manually, or install the background service below."
 
 echo
 read -r -p "Install/update Ringa host as a background service? [y/N] " service_answer
@@ -157,5 +161,84 @@ EOF
     ;;
   *)
     echo "Background service setup skipped."
+    ;;
+esac
+
+echo
+read -r -p "Build Android debug APK now? [y/N] " build_android_answer
+case "$build_android_answer" in
+  y|Y|yes|YES)
+    if [[ ! -x "$GRADLEW_PATH" ]]; then
+      echo "Android build script not found or not executable: $GRADLEW_PATH" >&2
+      exit 1
+    fi
+
+    echo "Building Android debug APK..."
+    (
+      cd "$ANDROID_DIR"
+      ./gradlew assembleDebug
+    )
+
+    if [[ ! -f "$APK_PATH" ]]; then
+      echo "Build finished but APK not found at expected path:" >&2
+      echo "  $APK_PATH" >&2
+      exit 1
+    fi
+
+    echo "APK ready:"
+    echo "  $APK_PATH"
+    echo
+    read -r -p "Install APK to connected Android device via adb now? [y/N] " install_android_answer
+    case "$install_android_answer" in
+      y|Y|yes|YES)
+        if ! command -v adb >/dev/null 2>&1; then
+          echo "adb not found. Install Android platform-tools first." >&2
+          echo "Manual APK path:"
+          echo "  $APK_PATH"
+          exit 1
+        fi
+
+        mapfile -t ADB_DEVICES < <(adb devices | awk 'NR>1 && $2=="device" {print $1}')
+        if [[ "${#ADB_DEVICES[@]}" -eq 0 ]]; then
+          echo "No adb devices in 'device' state were found."
+          echo "Manual APK path:"
+          echo "  $APK_PATH"
+          exit 1
+        fi
+
+        TARGET_DEVICE=""
+        if [[ "${#ADB_DEVICES[@]}" -eq 1 ]]; then
+          TARGET_DEVICE="${ADB_DEVICES[0]}"
+          echo "Installing to device: $TARGET_DEVICE"
+        else
+          echo "Multiple adb devices found:"
+          for i in "${!ADB_DEVICES[@]}"; do
+            printf "  %d) %s\n" "$((i + 1))" "${ADB_DEVICES[$i]}"
+          done
+          echo
+          read -r -p "Choose device number [1-${#ADB_DEVICES[@]}]: " selected_index
+          if [[ ! "$selected_index" =~ ^[0-9]+$ ]] || (( selected_index < 1 || selected_index > ${#ADB_DEVICES[@]} )); then
+            echo "Invalid selection." >&2
+            exit 1
+          fi
+          TARGET_DEVICE="${ADB_DEVICES[$((selected_index - 1))]}"
+        fi
+
+        adb -s "$TARGET_DEVICE" install -r "$APK_PATH"
+        echo "APK installed to: $TARGET_DEVICE"
+        ;;
+      *)
+        echo "ADB install skipped."
+        echo "Manual APK path:"
+        echo "  $APK_PATH"
+        ;;
+    esac
+    ;;
+  *)
+    echo "Android APK build skipped."
+    if [[ -f "$APK_PATH" ]]; then
+      echo "Existing APK path:"
+      echo "  $APK_PATH"
+    fi
     ;;
 esac
