@@ -160,7 +160,7 @@ Dial request payload from Linux `tel:` handler (`install.sh` option):
 - `--forward-url`: Android endpoint URL to forward each message (manual mode).
 - `--auto-discover`: discover Android endpoint automatically via mDNS.
 - `--forward-timeout`: seconds before forwarding request times out.
-- `--discover-service-type`: mDNS service type (default: `_ringa-receiver._tcp.local.`).
+- `--discover-service-type`: mDNS service type (default: `_ringa-receiver._tcp.local.`; short form without `.local.` is accepted).
 - `--discover-timeout`: mDNS lookup timeout seconds.
 - `--discover-name`: substring filter for service names (default: `RingaReceiver`).
 

@@ -2,6 +2,8 @@
 import argparse
 import datetime as dt
 import json
+import shutil
+import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
@@ -27,17 +29,20 @@ def discover_forward_url(
     if Zeroconf is None or ServiceBrowser is None:
         return None, "python package 'zeroconf' is not installed; run: pip install zeroconf"
 
-    if not service_type.endswith("."):
-        service_type = service_type + "."
+    normalized = service_type if service_type.endswith(".") else service_type + "."
+    if normalized.endswith(".local."):
+        service_types = [normalized]
+    else:
+        service_types = [normalized[:-1] + ".local."]
 
     found_event = threading.Event()
     result: Dict[str, str] = {}
 
     class FirstServiceListener(ServiceListener):  # type: ignore[misc, valid-type]
-        def _capture(self, zc: Zeroconf, service_name: str) -> None:
+        def _capture(self, zc: Zeroconf, discovered_type: str, service_name: str) -> None:
             if name_substring and name_substring.lower() not in service_name.lower():
                 return
-            info = zc.get_service_info(service_type, service_name, timeout=int(timeout_seconds * 1000))
+            info = zc.get_service_info(discovered_type, service_name, timeout=int(timeout_seconds * 1000))
             if info is None:
                 return
             addresses = info.parsed_addresses()
@@ -47,15 +52,14 @@ def discover_forward_url(
             selected_addr = ipv4_addresses[0] if ipv4_addresses else addresses[0]
             result["url"] = f"http://{selected_addr}:{info.port}/message"
             result["service_name"] = service_name
+            result["service_type"] = discovered_type
             found_event.set()
 
         def add_service(self, zc: Zeroconf, discovered_type: str, service_name: str) -> None:
-            del discovered_type
-            self._capture(zc, service_name)
+            self._capture(zc, discovered_type, service_name)
 
         def update_service(self, zc: Zeroconf, discovered_type: str, service_name: str) -> None:
-            del discovered_type
-            self._capture(zc, service_name)
+            self._capture(zc, discovered_type, service_name)
 
         def remove_service(self, zc: Zeroconf, discovered_type: str, service_name: str) -> None:
             del zc, discovered_type, service_name
@@ -63,14 +67,83 @@ def discover_forward_url(
 
     zc = Zeroconf()
     try:
-        ServiceBrowser(zc, service_type, FirstServiceListener())
+        for candidate in service_types:
+            ServiceBrowser(zc, candidate, FirstServiceListener())
         found_event.wait(timeout_seconds)
     finally:
         zc.close()
 
     if "url" in result:
         return result["url"], None
-    return None, f"no matching service found for {service_type} in {timeout_seconds:.1f}s"
+    avahi_url, avahi_error = discover_forward_url_avahi(service_type, timeout_seconds, name_substring)
+    if avahi_url:
+        return avahi_url, None
+    return None, (
+        f"no matching service found for {service_types} in {timeout_seconds:.1f}s"
+        f"; avahi fallback: {avahi_error}"
+    )
+
+
+def discover_forward_url_avahi(
+    service_type: str,
+    timeout_seconds: float,
+    name_substring: Optional[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    if shutil.which("avahi-browse") is None:
+        return None, "avahi-browse not found"
+
+    normalized = service_type if service_type.endswith(".") else service_type + "."
+    if normalized.endswith(".local."):
+        browse_type = normalized[: -len(".local.")]
+    else:
+        browse_type = normalized[:-1]
+
+    cmd = ["avahi-browse", "-prt", browse_type]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=max(1.0, timeout_seconds + 0.5),
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "avahi-browse timed out"
+    except Exception as exc:  # pylint: disable=broad-except
+        return None, str(exc)
+
+    if proc.returncode != 0:
+        stderr = (proc.stderr or "").strip()
+        return None, stderr or f"avahi-browse failed with exit code {proc.returncode}"
+
+    ipv4_match: Optional[Tuple[str, str]] = None
+    any_match: Optional[Tuple[str, str]] = None
+    for line in (proc.stdout or "").splitlines():
+        if not line.startswith("="):
+            continue
+        parts = line.split(";")
+        if len(parts) < 9:
+            continue
+        proto = parts[2]
+        service_name = parts[3]
+        address = parts[7]
+        port = parts[8]
+        if name_substring and name_substring.lower() not in service_name.lower():
+            continue
+        if not address or not port.isdigit():
+            continue
+        candidate = (address, port)
+        if proto == "IPv4":
+            ipv4_match = candidate
+            break
+        if any_match is None:
+            any_match = candidate
+
+    selected = ipv4_match or any_match
+    if selected is None:
+        return None, f"no matching avahi service for {browse_type}"
+
+    return f"http://{selected[0]}:{selected[1]}/message", None
 
 
 class MessageHandler(BaseHTTPRequestHandler):
