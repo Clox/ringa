@@ -299,6 +299,7 @@ class ReceiverService : Service() {
             "Ringa Receiver",
             NotificationManager.IMPORTANCE_LOW,
         )
+        channel.lockscreenVisibility = Notification.VISIBILITY_SECRET
         nm.createNotificationChannel(channel)
         val dialChannel = NotificationChannel(
             DIAL_CHANNEL_ID,
@@ -318,16 +319,6 @@ class ReceiverService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val stopIntent = Intent(this, ReceiverService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            this,
-            2,
-            stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -338,8 +329,8 @@ class ReceiverService : Service() {
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.stat_sys_phone_call)
             .setOngoing(true)
+            .setVisibility(Notification.VISIBILITY_SECRET)
             .setContentIntent(openPendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPendingIntent)
             .build()
     }
 
