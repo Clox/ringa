@@ -1,5 +1,6 @@
 package com.ringa.receiver
 
+import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,4 +41,21 @@ fun nowString(): String {
 
 fun escapeForJson(value: String): String {
     return value.replace("\\", "\\\\").replace("\"", "\\\"")
+}
+
+object ReceiverPrefs {
+    private const val PREFS_NAME = "ringa_receiver_prefs"
+    private const val KEY_USE_ROOT_DIRECT_DIAL = "use_root_direct_dial"
+
+    fun shouldUseRootDirectDial(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_USE_ROOT_DIRECT_DIAL, false)
+    }
+
+    fun setUseRootDirectDial(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_USE_ROOT_DIRECT_DIAL, enabled)
+            .apply()
+    }
 }

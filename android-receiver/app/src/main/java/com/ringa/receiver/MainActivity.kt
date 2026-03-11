@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -111,6 +112,19 @@ class MainActivity : Activity() {
             setPadding(0, 20, 0, 8)
         }
 
+        val rootDialCheckbox = CheckBox(this).apply {
+            text = "Use root for direct dial launch (background)"
+            textSize = 13f
+            setPadding(0, 12, 0, 0)
+            isChecked = ReceiverPrefs.shouldUseRootDirectDial(this@MainActivity)
+            setOnCheckedChangeListener { _, checked ->
+                ReceiverPrefs.setUseRootDirectDial(this@MainActivity, checked)
+                ReceiverState.log(
+                    "[${nowString()}] Root direct dial launch: " + if (checked) "enabled" else "disabled",
+                )
+            }
+        }
+
         logText = TextView(this).apply {
             textSize = 13f
             typeface = Typeface.MONOSPACE
@@ -122,6 +136,7 @@ class MainActivity : Activity() {
         content.addView(statusText)
         content.addView(endpointText)
         content.addView(buttonRow)
+        content.addView(rootDialCheckbox)
         content.addView(logHeader)
         content.addView(logText, LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         root.addView(content)

@@ -195,7 +195,17 @@ class ReceiverService : Service() {
         }
 
         if (!ReceiverState.appInForeground) {
-            ReceiverState.log("[${nowString()}] Dial request queued via notification: $number")
+            if (ReceiverPrefs.shouldUseRootDirectDial(this)) {
+                if (launchDialerViaRoot(number)) {
+                    ReceiverState.log("[${nowString()}] Opened dialer with root: $number")
+                    return
+                }
+                ReceiverState.log(
+                    "[${nowString()}] Root dial launch failed; fallback to notification: $number",
+                )
+            } else {
+                ReceiverState.log("[${nowString()}] Dial request queued via notification: $number")
+            }
             postDialNotification(number)
             return
         }
@@ -239,6 +249,27 @@ class ReceiverService : Service() {
         }
 
         pendingDial.send()
+    }
+
+    private fun launchDialerViaRoot(number: String): Boolean {
+        val command = "am start -a android.intent.action.DIAL -d tel:${Uri.encode(number)}"
+        return try {
+            val process = ProcessBuilder("su", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText().trim() }
+            val exitCode = process.waitFor()
+            if (exitCode == 0) {
+                true
+            } else {
+                val suffix = if (output.isNotEmpty()) ": $output" else ""
+                ReceiverState.log("[${nowString()}] Root command exit=$exitCode$suffix")
+                false
+            }
+        } catch (e: Exception) {
+            ReceiverState.log("[${nowString()}] Root command failed: ${e.message}")
+            false
+        }
     }
 
     private fun registerNsdService(port: Int) {
