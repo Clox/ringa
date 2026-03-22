@@ -100,7 +100,7 @@ class ReceiverService : Service() {
         ReceiverState.endpoint = endpoint
         acquireLocks()
 
-        val newServer = AndroidMessageServer(listenPort) { incomingRequest ->
+        val newServer = AndroidMessageServer(applicationContext, listenPort) { incomingRequest ->
             ReceiverState.log(incomingRequest.logLine)
             when {
                 incomingRequest.requestType == "clipboard" -> {
@@ -483,7 +483,14 @@ data class IncomingRequest(
     val clipboardText: String?,
 )
 
+data class ClipboardFetchResult(
+    val status: NanoHTTPD.Response.Status,
+    val body: String,
+    val logMessage: String,
+)
+
 class AndroidMessageServer(
+    private val context: Context,
     port: Int,
     private val onMessageLine: (IncomingRequest) -> Unit,
 ) : NanoHTTPD("0.0.0.0", port) {
@@ -515,6 +522,18 @@ class AndroidMessageServer(
             val clipboardText = extractClipboardText(json)
             if (requestType == "clipboard" && clipboardText == null) {
                 throw IllegalArgumentException("clipboard request missing clipboard_text payload")
+            }
+            if (requestType == "clipboard_fetch") {
+                val fetchResult = buildClipboardFetchResult()
+                onMessageLine(
+                    IncomingRequest(
+                        requestType = requestType,
+                        logLine = "[${nowString()}] $source: ${fetchResult.logMessage}",
+                        dialNumber = null,
+                        clipboardText = null,
+                    ),
+                )
+                return jsonResponse(fetchResult.status, fetchResult.body)
             }
             val message = extractDisplayMessage(
                 json = json,
@@ -597,6 +616,41 @@ class AndroidMessageServer(
         } catch (e: IllegalArgumentException) {
             throw IllegalArgumentException("invalid clipboard_text_b64", e)
         }
+    }
+
+    private fun buildClipboardFetchResult(): ClipboardFetchResult {
+        if (!ReceiverState.appInForeground) {
+            return ClipboardFetchResult(
+                status = Response.Status.CONFLICT,
+                body = """{"ok":false,"error":"clipboard export requires the Ringa app to stay open on the phone"}""",
+                logMessage = "clipboard fetch denied -> app not in foreground",
+            )
+        }
+
+        val clipboardManager = context.getSystemService(ClipboardManager::class.java)
+        if (clipboardManager == null) {
+            return ClipboardFetchResult(
+                status = Response.Status.INTERNAL_ERROR,
+                body = """{"ok":false,"error":"ClipboardManager unavailable"}""",
+                logMessage = "clipboard fetch failed -> ClipboardManager unavailable",
+            )
+        }
+
+        val clipboardText = clipboardManager.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.coerceToText(context)
+            ?.toString()
+            .orEmpty()
+        val encoded = Base64.encodeToString(
+            clipboardText.toByteArray(Charsets.UTF_8),
+            Base64.NO_WRAP,
+        )
+        return ClipboardFetchResult(
+            status = Response.Status.OK,
+            body = """{"ok":true,"clipboard_text_b64":"${escapeForJson(encoded)}","clipboard_length":${clipboardText.length}}""",
+            logMessage = "clipboard fetch -> ${clipboardText.length} chars",
+        )
     }
 
     private fun extractDisplayMessage(

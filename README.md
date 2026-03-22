@@ -106,7 +106,35 @@ RINGA_ENDPOINT=http://127.0.0.1:8765/message ./terminal-host/ringa-send-clipboar
 
 This script is intended to be safe to bind to a desktop keyboard shortcut as long as the local Ringa host service is running.
 
-## 6) Optional: Linux system `tel:` handler
+## 6) Fetch clipboard text from Android to PC
+
+Use the fetch script:
+
+```bash
+cd /home/oscar/projects/ringa
+./terminal-host/ringa-fetch-clipboard.sh
+```
+
+Behavior:
+
+- Sends a clipboard fetch request to the local Ringa host on `http://127.0.0.1:8765/message`.
+- The host forwards that request to the Android app over the existing LAN auto-discovery path.
+- On success, the returned text is written into the local clipboard.
+- Use `--print` if you want the fetched text on stdout instead.
+
+Examples:
+
+```bash
+./terminal-host/ringa-fetch-clipboard.sh
+./terminal-host/ringa-fetch-clipboard.sh --print
+RINGA_ENDPOINT=http://127.0.0.1:8765/message ./terminal-host/ringa-fetch-clipboard.sh
+```
+
+Important limitation:
+
+- The `Ringa` app must stay open on the phone while fetching. Android clipboard privacy restrictions prevent background clipboard reads.
+
+## 7) Optional: Linux system `tel:` handler
 
 If you want desktop `tel:` links to route into the local terminal host:
 
@@ -191,6 +219,17 @@ Clipboard request payload from the shell sender:
   "request_type": "clipboard",
   "clipboard_text_b64": "aGVsbG8gZnJvbSBwYw==",
   "trigger": "shell_clipboard_sender"
+}
+```
+
+Clipboard fetch request payload from the shell fetcher:
+
+```json
+{
+  "source": "ringa-clipboard-fetch-script",
+  "sent_at": "2026-03-22T18:00:00+01:00",
+  "request_type": "clipboard_fetch",
+  "trigger": "shell_clipboard_fetch"
 }
 ```
 

@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import threading
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
 from urllib import error, request
@@ -43,13 +44,27 @@ def sanitize_payload_for_log(value: Any) -> Any:
     return value
 
 
+@dataclass(frozen=True)
+class ForwardResult:
+    ok: bool
+    detail: str
+    response_status: Optional[int] = None
+    response_body: Optional[str] = None
+
+
 def discover_forward_url(
     service_type: str,
     timeout_seconds: float,
     name_substring: Optional[str],
 ) -> Tuple[Optional[str], Optional[str]]:
     if Zeroconf is None or ServiceBrowser is None:
-        return None, "python package 'zeroconf' is not installed; run: pip install zeroconf"
+        avahi_url, avahi_error = discover_forward_url_avahi(service_type, timeout_seconds, name_substring)
+        if avahi_url:
+            return avahi_url, None
+        return None, (
+            "python package 'zeroconf' is not installed; run: pip install zeroconf"
+            f"; avahi fallback: {avahi_error}"
+        )
 
     normalized = service_type if service_type.endswith(".") else service_type + "."
     if normalized.endswith(".local."):
@@ -207,35 +222,60 @@ class MessageHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'{"ok":false,"error":"invalid json"}')
             return
 
+        request_type = str(payload.get("request_type") or "").strip()
         print(f"[{now_iso()}] Received message")
         print(json.dumps(sanitize_payload_for_log(payload), indent=2, ensure_ascii=True))
         forward_result = self._forward_to_android(payload)
         if forward_result is not None:
-            forwarded_ok, detail = forward_result
-            if forwarded_ok:
-                print(f"Forwarded to Android: {detail}")
+            if forward_result.ok:
+                print(f"Forwarded to Android: {forward_result.detail}")
             else:
-                print(f"Forward to Android failed: {detail}")
+                print(f"Forward to Android failed: {forward_result.detail}")
         print("-" * 40, flush=True)
+
+        if request_type == "clipboard_fetch":
+            self._respond_with_clipboard_fetch(forward_result)
+            return
 
         response = json.dumps(
             {
                 "ok": True,
                 "received_at": now_iso(),
                 "echo": payload,
-                "forwarded": (forward_result[0] if forward_result is not None else None),
-                "forward_detail": (forward_result[1] if forward_result is not None else None),
+                "forwarded": (forward_result.ok if forward_result is not None else None),
+                "forward_detail": (forward_result.detail if forward_result is not None else None),
             },
             ensure_ascii=True,
         ).encode("utf-8")
         self._set_headers(200)
         self.wfile.write(response)
 
-    def _forward_to_android(self, payload: Dict[str, Any]) -> Optional[Tuple[bool, str]]:
+    def _respond_with_clipboard_fetch(self, forward_result: Optional[ForwardResult]) -> None:
+        if forward_result is None:
+            self._set_headers(503)
+            self.wfile.write(
+                b'{"ok":false,"error":"Android forwarding is disabled; set --forward-url or --auto-discover"}',
+            )
+            return
+
+        status_code = forward_result.response_status or (200 if forward_result.ok else 502)
+        body = forward_result.response_body
+        if body is None:
+            body = json.dumps(
+                {
+                    "ok": forward_result.ok,
+                    "error": forward_result.detail,
+                },
+                ensure_ascii=True,
+            )
+        self._set_headers(status_code)
+        self.wfile.write(body.encode("utf-8"))
+
+    def _forward_to_android(self, payload: Dict[str, Any]) -> Optional[ForwardResult]:
         target_url, discover_error = self._resolve_forward_url()
         if target_url is None:
             if self.auto_discover:
-                return False, f"auto-discovery failed: {discover_error or 'unknown error'}"
+                return ForwardResult(False, f"auto-discovery failed: {discover_error or 'unknown error'}")
             return None
 
         forwarded_payload: Dict[str, Any] = dict(payload)
@@ -245,22 +285,40 @@ class MessageHandler(BaseHTTPRequestHandler):
         forwarded_payload["forwarded_at"] = now_iso()
         forwarded_payload["browser_payload"] = payload
 
-        ok, detail = self._send_forward_payload(target_url, forwarded_payload)
-        if ok:
-            return True, f"{target_url} -> {detail}"
+        send_result = self._send_forward_payload(target_url, forwarded_payload)
+        if send_result.ok:
+            return self._with_target_detail(target_url, send_result)
 
         # Auto-discover mode retries once with a fresh discovery in case phone IP changed.
-        if self.auto_discover and self.forward_url is None:
+        if self.auto_discover and self.forward_url is None and send_result.response_status is None:
             retry_url, retry_error = self._resolve_forward_url(force_refresh=True)
             if retry_url and retry_url != target_url:
-                retry_ok, retry_detail = self._send_forward_payload(retry_url, forwarded_payload)
-                if retry_ok:
-                    return True, f"{retry_url} -> {retry_detail}"
-                return False, f"{target_url} -> {detail}; retry {retry_url} -> {retry_detail}"
+                retry_result = self._send_forward_payload(retry_url, forwarded_payload)
+                if retry_result.ok:
+                    return self._with_target_detail(retry_url, retry_result)
+                return ForwardResult(
+                    False,
+                    f"{target_url} -> {send_result.detail}; retry {retry_url} -> {retry_result.detail}",
+                    response_status=(retry_result.response_status or send_result.response_status),
+                    response_body=(retry_result.response_body or send_result.response_body),
+                )
             if retry_error:
-                return False, f"{target_url} -> {detail}; rediscovery failed: {retry_error}"
+                return ForwardResult(
+                    False,
+                    f"{target_url} -> {send_result.detail}; rediscovery failed: {retry_error}",
+                    response_status=send_result.response_status,
+                    response_body=send_result.response_body,
+                )
 
-        return False, f"{target_url} -> {detail}"
+        return self._with_target_detail(target_url, send_result)
+
+    def _with_target_detail(self, target_url: str, result: ForwardResult) -> ForwardResult:
+        return ForwardResult(
+            ok=result.ok,
+            detail=f"{target_url} -> {result.detail}",
+            response_status=result.response_status,
+            response_body=result.response_body,
+        )
 
     def _resolve_forward_url(self, force_refresh: bool = False) -> Tuple[Optional[str], Optional[str]]:
         if self.forward_url:
@@ -290,7 +348,7 @@ class MessageHandler(BaseHTTPRequestHandler):
             self.discover_error = discover_error
             return None, discover_error
 
-    def _send_forward_payload(self, url: str, payload: Dict[str, Any]) -> Tuple[bool, str]:
+    def _send_forward_payload(self, url: str, payload: Dict[str, Any]) -> ForwardResult:
         req = request.Request(
             url=url,
             data=json.dumps(payload, ensure_ascii=True).encode("utf-8"),
@@ -301,13 +359,23 @@ class MessageHandler(BaseHTTPRequestHandler):
             with request.urlopen(req, timeout=self.forward_timeout) as resp:
                 body = resp.read().decode("utf-8", errors="replace")
                 short_body = (body[:160] + "...") if len(body) > 160 else body
-                return True, f"HTTP {resp.status} {short_body}"
+                return ForwardResult(
+                    True,
+                    f"HTTP {resp.status} {short_body}",
+                    response_status=resp.status,
+                    response_body=body,
+                )
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
             short_body = (body[:160] + "...") if len(body) > 160 else body
-            return False, f"HTTP {exc.code} {short_body}"
+            return ForwardResult(
+                False,
+                f"HTTP {exc.code} {short_body}",
+                response_status=exc.code,
+                response_body=body,
+            )
         except Exception as exc:  # pylint: disable=broad-except
-            return False, str(exc)
+            return ForwardResult(False, str(exc))
 
     def log_message(self, fmt: str, *args: Any) -> None:
         # Keep terminal output focused on incoming messages.
