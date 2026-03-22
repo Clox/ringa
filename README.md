@@ -6,6 +6,8 @@ This repo contains three pieces:
 - `terminal-host/`: Python terminal app that receives browser messages and forwards them.
 - `android-receiver/`: Android app that runs a foreground listener service on LAN, displays events, and advertises itself via mDNS.
 
+The suite also supports clipboard sync from the PC to the Android device over the same terminal-host -> mDNS -> Android path.
+
 ## Message flow
 
 `Chrome extension` -> `terminal-host/server.py` -> `Android app endpoint`
@@ -78,7 +80,33 @@ You will see:
   - if app UI is visible, Android app opens the dialer directly.
   - if app UI is backgrounded, Android posts a high-priority "Tap to dial" notification (Android background-launch policy).
 
-## 5) Optional: Linux system `tel:` handler
+## 5) Send clipboard text from PC to Android
+
+Use the dedicated sender script:
+
+```bash
+cd /home/oscar/projects/ringa
+./terminal-host/ringa-send-clipboard.sh
+```
+
+Behavior:
+
+- Reads from stdin if data is piped in.
+- Otherwise reads from the local clipboard (`pbpaste`, `wl-paste`, `xclip`, `xsel`, or `powershell.exe`).
+- Sends the clipboard payload to the local Ringa host on `http://127.0.0.1:8765/message` by default.
+- The terminal host then forwards it to the Android app using the existing LAN auto-discovery flow.
+
+Examples:
+
+```bash
+printf 'hello from pc' | ./terminal-host/ringa-send-clipboard.sh
+./terminal-host/ringa-send-clipboard.sh --text "hello from pc"
+RINGA_ENDPOINT=http://127.0.0.1:8765/message ./terminal-host/ringa-send-clipboard.sh
+```
+
+This script is intended to be safe to bind to a desktop keyboard shortcut as long as the local Ringa host service is running.
+
+## 6) Optional: Linux system `tel:` handler
 
 If you want desktop `tel:` links to route into the local terminal host:
 
@@ -154,6 +182,18 @@ Dial request payload from Linux `tel:` handler (`install.sh` option):
 }
 ```
 
+Clipboard request payload from the shell sender:
+
+```json
+{
+  "source": "ringa-clipboard-script",
+  "sent_at": "2026-03-22T18:00:00+01:00",
+  "request_type": "clipboard",
+  "clipboard_text_b64": "aGVsbG8gZnJvbSBwYw==",
+  "trigger": "shell_clipboard_sender"
+}
+```
+
 ## Terminal host flags
 
 - `--host` and `--port`: where the local Chrome-facing endpoint runs.
@@ -170,4 +210,8 @@ Dial request payload from Linux `tel:` handler (`install.sh` option):
 curl -X POST http://127.0.0.1:8765/message \
   -H "Content-Type: application/json" \
   -d '{"source":"cli","request_type":"dial","dial_number":"0462769200"}'
+
+curl -X POST http://127.0.0.1:8765/message \
+  -H "Content-Type: application/json" \
+  -d '{"source":"cli","request_type":"clipboard","clipboard_text_b64":"aGVsbG8="}'
 ```

@@ -21,6 +21,28 @@ def now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def redact_clipboard_value(key: str, value: Any) -> str:
+    if not isinstance(value, str):
+        return "<redacted>"
+    if key == "clipboard_text_b64":
+        return f"<base64 {len(value)} chars redacted>"
+    return f"<{len(value)} chars redacted>"
+
+
+def sanitize_payload_for_log(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: Dict[str, Any] = {}
+        for key, nested_value in value.items():
+            if key in {"clipboard_text", "clipboard_text_b64"}:
+                sanitized[key] = redact_clipboard_value(key, nested_value)
+            else:
+                sanitized[key] = sanitize_payload_for_log(nested_value)
+        return sanitized
+    if isinstance(value, list):
+        return [sanitize_payload_for_log(item) for item in value]
+    return value
+
+
 def discover_forward_url(
     service_type: str,
     timeout_seconds: float,
@@ -186,7 +208,7 @@ class MessageHandler(BaseHTTPRequestHandler):
             return
 
         print(f"[{now_iso()}] Received message")
-        print(json.dumps(payload, indent=2, ensure_ascii=True))
+        print(json.dumps(sanitize_payload_for_log(payload), indent=2, ensure_ascii=True))
         forward_result = self._forward_to_android(payload)
         if forward_result is not None:
             forwarded_ok, detail = forward_result
@@ -216,14 +238,12 @@ class MessageHandler(BaseHTTPRequestHandler):
                 return False, f"auto-discovery failed: {discover_error or 'unknown error'}"
             return None
 
-        forwarded_payload: Dict[str, Any] = {
-            "source": "terminal-host",
-            "forwarded_at": now_iso(),
-            "request_type": payload.get("request_type"),
-            "dial_number": payload.get("dial_number"),
-            "message": payload.get("message"),
-            "browser_payload": payload,
-        }
+        forwarded_payload: Dict[str, Any] = dict(payload)
+        if not forwarded_payload.get("source"):
+            forwarded_payload["source"] = "terminal-host"
+        forwarded_payload["forwarded_by"] = "terminal-host"
+        forwarded_payload["forwarded_at"] = now_iso()
+        forwarded_payload["browser_payload"] = payload
 
         ok, detail = self._send_forward_payload(target_url, forwarded_payload)
         if ok:

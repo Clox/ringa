@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.app.ActivityOptions
 import android.app.AlarmManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
@@ -18,6 +20,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
+import android.util.Base64
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONObject
 import java.net.Inet4Address
@@ -97,10 +100,16 @@ class ReceiverService : Service() {
         ReceiverState.endpoint = endpoint
         acquireLocks()
 
-        val newServer = AndroidMessageServer(listenPort) { line, dialNumber ->
-            ReceiverState.log(line)
-            if (!dialNumber.isNullOrBlank()) {
-                handleDialRequest(dialNumber)
+        val newServer = AndroidMessageServer(listenPort) { incomingRequest ->
+            ReceiverState.log(incomingRequest.logLine)
+            when {
+                incomingRequest.requestType == "clipboard" -> {
+                    handleClipboardRequest(incomingRequest.clipboardText)
+                }
+
+                !incomingRequest.dialNumber.isNullOrBlank() -> {
+                    handleDialRequest(incomingRequest.dialNumber)
+                }
             }
         }
 
@@ -216,6 +225,26 @@ class ReceiverService : Service() {
         } catch (e: Exception) {
             ReceiverState.log("[${nowString()}] Dialer launch failed: ${e.message}")
             postDialNotification(number)
+        }
+    }
+
+    private fun handleClipboardRequest(rawText: String?) {
+        if (rawText == null) {
+            ReceiverState.log("[${nowString()}] Clipboard request missing text payload")
+            return
+        }
+
+        val clipboardManager = getSystemService(ClipboardManager::class.java)
+        if (clipboardManager == null) {
+            ReceiverState.log("[${nowString()}] Clipboard update failed: ClipboardManager unavailable")
+            return
+        }
+
+        try {
+            clipboardManager.setPrimaryClip(ClipData.newPlainText("ringa", rawText))
+            ReceiverState.log("[${nowString()}] Clipboard updated (${rawText.length} chars)")
+        } catch (e: Exception) {
+            ReceiverState.log("[${nowString()}] Clipboard update failed: ${e.message}")
         }
     }
 
@@ -447,9 +476,16 @@ class ReceiverService : Service() {
     }
 }
 
+data class IncomingRequest(
+    val requestType: String,
+    val logLine: String,
+    val dialNumber: String?,
+    val clipboardText: String?,
+)
+
 class AndroidMessageServer(
     port: Int,
-    private val onMessageLine: (String, String?) -> Unit,
+    private val onMessageLine: (IncomingRequest) -> Unit,
 ) : NanoHTTPD("0.0.0.0", port) {
 
     override fun serve(session: IHTTPSession): Response {
@@ -473,11 +509,29 @@ class AndroidMessageServer(
             session.parseBody(files)
             val rawBody = files["postData"] ?: "{}"
             val json = JSONObject(rawBody)
-            val source = json.optString("source", "terminal-host")
+            val source = json.optString("source", "terminal-host").ifBlank { "terminal-host" }
+            val requestType = extractRequestType(json)
             val dialNumber = extractDialNumber(json)
-            val message = extractDisplayMessage(json, rawBody, dialNumber)
+            val clipboardText = extractClipboardText(json)
+            if (requestType == "clipboard" && clipboardText == null) {
+                throw IllegalArgumentException("clipboard request missing clipboard_text payload")
+            }
+            val message = extractDisplayMessage(
+                json = json,
+                fallbackRaw = rawBody,
+                requestType = requestType,
+                dialNumber = dialNumber,
+                clipboardText = clipboardText,
+            )
 
-            onMessageLine("[${nowString()}] $source: $message", dialNumber)
+            onMessageLine(
+                IncomingRequest(
+                    requestType = requestType,
+                    logLine = "[${nowString()}] $source: $message",
+                    dialNumber = dialNumber,
+                    clipboardText = clipboardText,
+                ),
+            )
             jsonResponse(Response.Status.OK, """{"ok":true}""")
         } catch (e: Exception) {
             jsonResponse(
@@ -495,6 +549,16 @@ class AndroidMessageServer(
         }
     }
 
+    private fun extractRequestType(json: JSONObject): String {
+        val topLevelType = json.optString("request_type", "").trim()
+        if (topLevelType.isNotEmpty()) {
+            return topLevelType
+        }
+
+        val browserPayload = json.optJSONObject("browser_payload") ?: return ""
+        return browserPayload.optString("request_type", "").trim()
+    }
+
     private fun extractDialNumber(json: JSONObject): String? {
         val topLevelNumber = json.optString("dial_number", "").trim()
         if (topLevelNumber.isNotEmpty()) {
@@ -509,9 +573,46 @@ class AndroidMessageServer(
         return null
     }
 
-    private fun extractDisplayMessage(json: JSONObject, fallbackRaw: String, dialNumber: String?): String {
+    private fun extractClipboardText(json: JSONObject): String? {
+        extractClipboardTextFromObject(json)?.let { return it }
+        val browserPayload = json.optJSONObject("browser_payload") ?: return null
+        return extractClipboardTextFromObject(browserPayload)
+    }
+
+    private fun extractClipboardTextFromObject(json: JSONObject): String? {
+        if (json.has("clipboard_text") && !json.isNull("clipboard_text")) {
+            return json.optString("clipboard_text", "")
+        }
+
+        if (json.has("clipboard_text_b64") && !json.isNull("clipboard_text_b64")) {
+            return decodeClipboardBase64(json.getString("clipboard_text_b64"))
+        }
+
+        return null
+    }
+
+    private fun decodeClipboardBase64(value: String): String {
+        return try {
+            String(Base64.decode(value, Base64.DEFAULT), Charsets.UTF_8)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("invalid clipboard_text_b64", e)
+        }
+    }
+
+    private fun extractDisplayMessage(
+        json: JSONObject,
+        fallbackRaw: String,
+        requestType: String,
+        dialNumber: String?,
+        clipboardText: String?,
+    ): String {
         if (!dialNumber.isNullOrBlank()) {
             return "dial request -> $dialNumber"
+        }
+
+        if (requestType == "clipboard" || clipboardText != null) {
+            val length = clipboardText?.length ?: 0
+            return "clipboard update -> $length chars"
         }
 
         val message = json.optString("message", "").trim()
