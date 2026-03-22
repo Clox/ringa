@@ -132,7 +132,8 @@ RINGA_ENDPOINT=http://127.0.0.1:8765/message ./terminal-host/ringa-fetch-clipboa
 
 Important limitation:
 
-- The `Ringa` app must stay open on the phone while fetching. Android clipboard privacy restrictions prevent background clipboard reads.
+- On non-rooted phones, the `Ringa` app must stay open on the phone while fetching. Android clipboard privacy restrictions prevent background clipboard reads.
+- On rooted phones, enable `Use root for clipboard export (background)` in the Android app to allow background fetches.
 
 ## 7) Optional: Linux system `tel:` handler
 

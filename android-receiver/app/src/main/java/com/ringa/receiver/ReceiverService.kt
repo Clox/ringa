@@ -489,6 +489,12 @@ data class ClipboardFetchResult(
     val logMessage: String,
 )
 
+data class RootClipboardReadResult(
+    val ok: Boolean,
+    val clipboardText: String? = null,
+    val errorMessage: String? = null,
+)
+
 class AndroidMessageServer(
     private val context: Context,
     port: Int,
@@ -619,6 +625,24 @@ class AndroidMessageServer(
     }
 
     private fun buildClipboardFetchResult(): ClipboardFetchResult {
+        if (!ReceiverState.appInForeground && ReceiverPrefs.shouldUseRootClipboardExport(context)) {
+            val rootResult = readClipboardViaRoot()
+            if (rootResult.ok) {
+                val clipboardText = rootResult.clipboardText.orEmpty()
+                return encodeClipboardFetchResult(
+                    clipboardText = clipboardText,
+                    logMessage = "clipboard fetch via root -> ${clipboardText.length} chars",
+                )
+            }
+
+            val errorMessage = rootResult.errorMessage ?: "root clipboard export failed"
+            return ClipboardFetchResult(
+                status = Response.Status.INTERNAL_ERROR,
+                body = """{"ok":false,"error":"${escapeForJson(errorMessage)}"}""",
+                logMessage = "clipboard fetch via root failed -> $errorMessage",
+            )
+        }
+
         if (!ReceiverState.appInForeground) {
             return ClipboardFetchResult(
                 status = Response.Status.CONFLICT,
@@ -642,6 +666,13 @@ class AndroidMessageServer(
             ?.coerceToText(context)
             ?.toString()
             .orEmpty()
+        return encodeClipboardFetchResult(
+            clipboardText = clipboardText,
+            logMessage = "clipboard fetch -> ${clipboardText.length} chars",
+        )
+    }
+
+    private fun encodeClipboardFetchResult(clipboardText: String, logMessage: String): ClipboardFetchResult {
         val encoded = Base64.encodeToString(
             clipboardText.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP,
@@ -649,8 +680,50 @@ class AndroidMessageServer(
         return ClipboardFetchResult(
             status = Response.Status.OK,
             body = """{"ok":true,"clipboard_text_b64":"${escapeForJson(encoded)}","clipboard_length":${clipboardText.length}}""",
-            logMessage = "clipboard fetch -> ${clipboardText.length} chars",
+            logMessage = logMessage,
         )
+    }
+
+    private fun readClipboardViaRoot(): RootClipboardReadResult {
+        val deviceId = ReceiverPrefs.getLastClipboardDeviceId(context)
+        val escapedPackagePath = shellSingleQuote(context.packageCodePath)
+        val command =
+            "CLASSPATH=$escapedPackagePath app_process /system/bin com.ringa.receiver.RootClipboardBridge get-primary-clip-b64 $deviceId"
+
+        return try {
+            val process = ProcessBuilder("su", "2000", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText().trim() }
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                val message = if (output.isNotEmpty()) output else "exit=$exitCode"
+                return RootClipboardReadResult(ok = false, errorMessage = message)
+            }
+
+            if (!output.startsWith("OK:")) {
+                val message = if (output.isNotEmpty()) output else "unexpected root helper output"
+                return RootClipboardReadResult(ok = false, errorMessage = message)
+            }
+
+            val encoded = output.removePrefix("OK:")
+            val clipboardText = try {
+                String(Base64.decode(encoded, Base64.DEFAULT), Charsets.UTF_8)
+            } catch (e: IllegalArgumentException) {
+                return RootClipboardReadResult(
+                    ok = false,
+                    errorMessage = "invalid base64 from root helper",
+                )
+            }
+
+            RootClipboardReadResult(ok = true, clipboardText = clipboardText)
+        } catch (e: Exception) {
+            RootClipboardReadResult(ok = false, errorMessage = e.message ?: "root clipboard export failed")
+        }
+    }
+
+    private fun shellSingleQuote(value: String): String {
+        return "'" + value.replace("'", "'\"'\"'") + "'"
     }
 
     private fun extractDisplayMessage(

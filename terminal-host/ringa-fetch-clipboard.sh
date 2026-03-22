@@ -18,7 +18,8 @@ Fetches clipboard text from the Android Ringa app and writes it to the local cli
 
 Notes:
   - The local Ringa host must be running.
-  - The Ringa app must stay open on the phone while fetching.
+  - On non-rooted phones, the Ringa app must stay open on the phone while fetching.
+  - On rooted phones, enable "Use root for clipboard export (background)" in the Android app to allow background fetches.
   - Use --print to write the fetched text to stdout instead of the local clipboard.
 EOF
 }

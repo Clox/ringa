@@ -2,6 +2,7 @@ package com.ringa.receiver
 
 import android.app.Activity
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
@@ -46,6 +47,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         ReceiverState.appInForeground = true
+        val deviceId = currentClipboardDeviceId()
+        ReceiverPrefs.setLastClipboardDeviceId(this, deviceId)
         uiHandler.post(refreshRunnable)
     }
 
@@ -125,6 +128,19 @@ class MainActivity : Activity() {
             }
         }
 
+        val rootClipboardCheckbox = CheckBox(this).apply {
+            text = "Use root for clipboard export (background)"
+            textSize = 13f
+            setPadding(0, 8, 0, 0)
+            isChecked = ReceiverPrefs.shouldUseRootClipboardExport(this@MainActivity)
+            setOnCheckedChangeListener { _, checked ->
+                ReceiverPrefs.setUseRootClipboardExport(this@MainActivity, checked)
+                ReceiverState.log(
+                    "[${nowString()}] Root clipboard export: " + if (checked) "enabled" else "disabled",
+                )
+            }
+        }
+
         logText = TextView(this).apply {
             textSize = 13f
             typeface = Typeface.MONOSPACE
@@ -137,6 +153,7 @@ class MainActivity : Activity() {
         content.addView(endpointText)
         content.addView(buttonRow)
         content.addView(rootDialCheckbox)
+        content.addView(rootClipboardCheckbox)
         content.addView(logHeader)
         content.addView(logText, LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         root.addView(content)
@@ -171,6 +188,15 @@ class MainActivity : Activity() {
             } catch (_: Exception) {
                 // Some OEMs block this intent; app still runs in foreground service mode.
             }
+        }
+    }
+
+    private fun currentClipboardDeviceId(): Int {
+        return try {
+            val method = Context::class.java.getMethod("getDeviceId")
+            (method.invoke(this) as? Int) ?: 0
+        } catch (_: Exception) {
+            0
         }
     }
 }

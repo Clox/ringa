@@ -46,6 +46,8 @@ fun escapeForJson(value: String): String {
 object ReceiverPrefs {
     private const val PREFS_NAME = "ringa_receiver_prefs"
     private const val KEY_USE_ROOT_DIRECT_DIAL = "use_root_direct_dial"
+    private const val KEY_USE_ROOT_CLIPBOARD_EXPORT = "use_root_clipboard_export"
+    private const val KEY_LAST_CLIPBOARD_DEVICE_ID = "last_clipboard_device_id"
 
     fun shouldUseRootDirectDial(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -56,6 +58,30 @@ object ReceiverPrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_USE_ROOT_DIRECT_DIAL, enabled)
+            .apply()
+    }
+
+    fun shouldUseRootClipboardExport(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_USE_ROOT_CLIPBOARD_EXPORT, false)
+    }
+
+    fun setUseRootClipboardExport(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_USE_ROOT_CLIPBOARD_EXPORT, enabled)
+            .apply()
+    }
+
+    fun getLastClipboardDeviceId(context: Context): Int {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getInt(KEY_LAST_CLIPBOARD_DEVICE_ID, 0)
+    }
+
+    fun setLastClipboardDeviceId(context: Context, deviceId: Int) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_LAST_CLIPBOARD_DEVICE_ID, deviceId)
             .apply()
     }
 }
