@@ -13,6 +13,18 @@ function setButtonsDisabled(disabled) {
   sendDialBtn.disabled = disabled;
 }
 
+function describeSendError(error) {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (
+    detail === "Failed to fetch" ||
+    detail.includes("NetworkError") ||
+    detail.includes("TypeError")
+  ) {
+    return `Ringa host is not running on this computer. Start the local host with ./install.sh, or make sure the service on ${ENDPOINT} is running.`;
+  }
+  return detail;
+}
+
 function basePayload() {
   return {
     source: "chrome-extension",
@@ -37,7 +49,7 @@ async function postPayload(payload, successText) {
 
     setStatus(successText, true);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "unknown error";
+    const detail = describeSendError(error);
     setStatus(`Failed to send: ${detail}`, false);
   } finally {
     setButtonsDisabled(false);

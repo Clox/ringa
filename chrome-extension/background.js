@@ -44,6 +44,18 @@ function buildPayload(dialNumber, info, tab) {
   };
 }
 
+function describeSendError(error) {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (
+    detail === "Failed to fetch" ||
+    detail.includes("NetworkError") ||
+    detail.includes("TypeError")
+  ) {
+    return `Ringa host is not running on this computer. Start the local host with ./install.sh, or make sure the service on ${ENDPOINT} is running.`;
+  }
+  return detail;
+}
+
 function hasContextMenusApi() {
   return Boolean(chrome.contextMenus && typeof chrome.contextMenus.create === "function");
 }
@@ -142,7 +154,7 @@ if (chrome.contextMenus && chrome.contextMenus.onClicked && typeof chrome.contex
     try {
       await postDialPayload(payload);
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
+      const detail = describeSendError(error);
       console.error("Failed to send dial request from context menu:", detail);
     }
   });
