@@ -2,7 +2,7 @@
 
 This repo contains three pieces:
 
-- `chrome-extension/`: Chrome extension that sends dial requests.
+- `chrome-extension/`: Chrome extension that sends dial requests and selected text to the phone clipboard.
 - `terminal-host/`: Python terminal app that receives browser messages and forwards them.
 - `android-receiver/`: Android app that runs a foreground listener service on LAN, displays events, and advertises itself via mDNS.
 
@@ -71,6 +71,10 @@ python3 terminal-host/server.py \
 1. Click the extension icon in Chrome.
 2. Enter a phone number and click `Send dial request`.
 3. You can also highlight a phone number in a web page, right-click, and choose `Dial via Ringa`.
+4. To send selected text to the phone clipboard, right-click the selection and choose `Send selection to phone clipboard`.
+5. To send other text, click the extension icon, paste the text into `Text for phone clipboard`, and click `Send to phone clipboard`.
+
+Chrome groups the two right-click actions under a `Ringa` submenu. After updating the unpacked extension, click its reload button on `chrome://extensions`; restarting Chrome is not required.
 
 You will see:
 

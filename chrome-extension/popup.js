@@ -1,8 +1,10 @@
 const ENDPOINT = "http://127.0.0.1:8765/message";
 
 const phoneInput = document.getElementById("phoneNumber");
+const clipboardInput = document.getElementById("clipboardText");
 const statusEl = document.getElementById("status");
 const sendDialBtn = document.getElementById("sendDialBtn");
+const sendClipboardBtn = document.getElementById("sendClipboardBtn");
 
 function setStatus(text, ok) {
   statusEl.textContent = text;
@@ -11,6 +13,7 @@ function setStatus(text, ok) {
 
 function setButtonsDisabled(disabled) {
   sendDialBtn.disabled = disabled;
+  sendClipboardBtn.disabled = disabled;
 }
 
 function describeSendError(error) {
@@ -47,6 +50,13 @@ async function postPayload(payload, successText) {
       throw new Error(`HTTP ${response.status}`);
     }
 
+    if (payload.request_type === "clipboard") {
+      const result = await response.json();
+      if (result.forwarded !== true) {
+        throw new Error(result.forward_detail || "The phone did not receive the request.");
+      }
+    }
+
     setStatus(successText, true);
   } catch (error) {
     const detail = describeSendError(error);
@@ -72,7 +82,23 @@ async function sendDialRequest() {
   await postPayload(payload, "Dial request sent.");
 }
 
+async function sendClipboardRequest() {
+  const clipboardText = clipboardInput.value;
+  if (!clipboardText.trim()) {
+    setStatus("Paste text into the clipboard field first.", false);
+    return;
+  }
+
+  await postPayload({
+    ...basePayload(),
+    request_type: "clipboard",
+    clipboard_text: clipboardText,
+    trigger: "extension_popup"
+  }, "Text sent to phone clipboard.");
+}
+
 sendDialBtn.addEventListener("click", sendDialRequest);
+sendClipboardBtn.addEventListener("click", sendClipboardRequest);
 
 phoneInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {

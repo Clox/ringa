@@ -38,13 +38,23 @@ label {
   color: var(--muted);
 }
 
-input[type="text"] {
+input[type="text"],
+textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px;
   background: var(--panel);
   color: var(--text);
+}
+
+textarea {
+  resize: vertical;
+  font: inherit;
+}
+
+#sendDialBtn + label {
+  margin-top: 16px;
 }
 
 button {

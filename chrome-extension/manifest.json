@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ringa",
   "version": "0.1.0",
-  "description": "Send dial requests from Chrome to the local Ringa host.",
+  "description": "Send dial requests and text to your phone via the local Ringa host.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
