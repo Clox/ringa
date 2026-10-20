@@ -113,6 +113,18 @@ RINGA_ENDPOINT=http://127.0.0.1:8765/message ./terminal-host/ringa-send-clipboar
 
 This script is intended to be safe to bind to a desktop keyboard shortcut as long as the local Ringa host service is running.
 
+### Send a local image from Nemo
+
+Right-click one local PNG, JPEG, GIF, or WebP file and choose `Skicka bild till telefonens urklipp`. The file must be no larger than 4 MB. Ringa shows a desktop notification with the result.
+
+`install.sh` adds this Nemo action when Nemo is installed. To add or refresh just the action, run:
+
+```bash
+bash terminal-host/install-nemo-action.sh
+```
+
+You can also send an image from the terminal with `python3 terminal-host/ringa-send-image.py /path/to/image.png`.
+
 ## 6) Fetch clipboard text from Android to PC
 
 Use the fetch script:

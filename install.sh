@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HANDLER_SCRIPT="$ROOT_DIR/terminal-host/ringa-tel-handler.sh"
 SEND_CLIPBOARD_SCRIPT="$ROOT_DIR/terminal-host/ringa-send-clipboard.sh"
 FETCH_CLIPBOARD_SCRIPT="$ROOT_DIR/terminal-host/ringa-fetch-clipboard.sh"
+INSTALL_NEMO_ACTION_SCRIPT="$ROOT_DIR/terminal-host/install-nemo-action.sh"
 SERVER_SCRIPT="$ROOT_DIR/terminal-host/server.py"
 REQUIREMENTS_FILE="$ROOT_DIR/terminal-host/requirements.txt"
 VENV_DIR="$ROOT_DIR/.venv"
@@ -40,6 +41,11 @@ mkdir -p "$APP_DIR" "$CONFIG_DIR" "$SYSTEMD_USER_DIR"
 chmod +x "$HANDLER_SCRIPT"
 chmod +x "$SEND_CLIPBOARD_SCRIPT"
 chmod +x "$FETCH_CLIPBOARD_SCRIPT"
+chmod +x "$INSTALL_NEMO_ACTION_SCRIPT"
+
+if command -v nemo >/dev/null 2>&1; then
+  "$INSTALL_NEMO_ACTION_SCRIPT"
+fi
 
 CURRENT_DEFAULT="$(xdg-mime query default x-scheme-handler/tel 2>/dev/null || true)"
 if [[ -n "$CURRENT_DEFAULT" && "$CURRENT_DEFAULT" != "$DESKTOP_ID" ]]; then
