@@ -74,7 +74,8 @@ python3 terminal-host/server.py \
 4. To send selected text to the phone clipboard, right-click the selection and choose `Send selection to phone clipboard`.
 5. To send other text, click the extension icon, paste the text into `Text for phone clipboard`, and click `Send to phone clipboard`.
 
-Chrome groups the two right-click actions under a `Ringa` submenu. After updating the unpacked extension, click its reload button on `chrome://extensions`; restarting Chrome is not required.
+Chrome groups the right-click actions under a `Ringa` submenu when both are enabled. With only one enabled, that action appears directly in the right-click menu. After updating the unpacked extension, click its reload button on `chrome://extensions`; restarting Chrome is not required.
+The popup has a separate switch for each action. Turn a switch off to hide that action from the right-click menu, or on to show it again. The setting is saved locally and takes effect immediately; the popup buttons remain available.
 
 You will see:
 

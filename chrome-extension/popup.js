@@ -5,6 +5,8 @@ const clipboardInput = document.getElementById("clipboardText");
 const statusEl = document.getElementById("status");
 const sendDialBtn = document.getElementById("sendDialBtn");
 const sendClipboardBtn = document.getElementById("sendClipboardBtn");
+const dialContextMenu = document.getElementById("dialContextMenu");
+const clipboardContextMenu = document.getElementById("clipboardContextMenu");
 
 function setStatus(text, ok) {
   statusEl.textContent = text;
@@ -97,8 +99,40 @@ async function sendClipboardRequest() {
   }, "Text sent to phone clipboard.");
 }
 
+async function loadContextMenuSettings() {
+  try {
+    const settings = await chrome.storage.local.get({
+      dialContextMenu: true,
+      clipboardContextMenu: true
+    });
+    dialContextMenu.checked = settings.dialContextMenu !== false;
+    clipboardContextMenu.checked = settings.clipboardContextMenu !== false;
+    dialContextMenu.disabled = false;
+    clipboardContextMenu.disabled = false;
+  } catch (error) {
+    setStatus(`Could not load menu settings: ${error.message}`, false);
+  }
+}
+
+async function saveContextMenuSetting(event) {
+  const toggle = event.currentTarget;
+  const enabled = toggle.checked;
+  toggle.disabled = true;
+  try {
+    await chrome.storage.local.set({ [toggle.id]: enabled });
+  } catch (error) {
+    toggle.checked = !enabled;
+    setStatus(`Could not save menu setting: ${error.message}`, false);
+  } finally {
+    toggle.disabled = false;
+  }
+}
+
 sendDialBtn.addEventListener("click", sendDialRequest);
 sendClipboardBtn.addEventListener("click", sendClipboardRequest);
+dialContextMenu.addEventListener("change", saveContextMenuSetting);
+clipboardContextMenu.addEventListener("change", saveContextMenuSetting);
+loadContextMenuSettings();
 
 phoneInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {

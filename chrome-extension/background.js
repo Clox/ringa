@@ -68,27 +68,39 @@ function describeSendError(error) {
   return detail;
 }
 
-function ensureContextMenu() {
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: DIAL_MENU_ID,
-      title: DIAL_MENU_TITLE,
-      contexts: ["selection"]
-    }, () => {
+async function ensureContextMenu() {
+  let settings;
+  try {
+    settings = await chrome.storage.local.get({
+      dialContextMenu: true,
+      clipboardContextMenu: true
+    });
+  } catch (error) {
+    console.error("Failed to load context menu settings:", error);
+    return;
+  }
+
+  try {
+    await chrome.contextMenus.removeAll();
+    if (settings.dialContextMenu !== false) {
+      await createContextMenu(DIAL_MENU_ID, DIAL_MENU_TITLE);
+    }
+    if (settings.clipboardContextMenu !== false) {
+      await createContextMenu(CLIPBOARD_MENU_ID, CLIPBOARD_MENU_TITLE);
+    }
+  } catch (error) {
+    console.error("Failed to update context menu:", error);
+  }
+}
+
+function createContextMenu(id, title) {
+  return new Promise((resolve, reject) => {
+    chrome.contextMenus.create({ id, title, contexts: ["selection"] }, () => {
       if (chrome.runtime.lastError) {
-        console.warn("Failed to create context menu:", chrome.runtime.lastError.message);
-        return;
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve();
       }
-      chrome.contextMenus.create({
-        id: CLIPBOARD_MENU_ID,
-        title: CLIPBOARD_MENU_TITLE,
-        contexts: ["selection"]
-      }, () => {
-        if (chrome.runtime.lastError) {
-          console.warn("Failed to create context menu:", chrome.runtime.lastError.message);
-          return;
-        }
-      });
     });
   });
 }
@@ -112,7 +124,20 @@ async function postPayload(payload) {
   }
 }
 
-chrome.runtime.onInstalled.addListener(ensureContextMenu);
+let contextMenuUpdate = Promise.resolve();
+
+function queueContextMenuUpdate() {
+  contextMenuUpdate = contextMenuUpdate.then(ensureContextMenu);
+}
+
+chrome.runtime.onInstalled.addListener(queueContextMenuUpdate);
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  if (changes.dialContextMenu || changes.clipboardContextMenu) {
+    queueContextMenuUpdate();
+  }
+});
 
 if (chrome.contextMenus && chrome.contextMenus.onClicked && typeof chrome.contextMenus.onClicked.addListener === "function") {
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {

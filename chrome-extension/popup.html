@@ -12,9 +12,17 @@
       <label for="phoneNumber">Phone number</label>
       <input id="phoneNumber" type="text" placeholder="+1 555 123 4567" />
       <button id="sendDialBtn" type="button">Send dial request</button>
+      <label class="context-toggle" for="dialContextMenu">
+        <span>Show dial in right-click menu</span>
+        <input id="dialContextMenu" type="checkbox" role="switch" checked disabled />
+      </label>
       <label for="clipboardText">Text for phone clipboard</label>
       <textarea id="clipboardText" rows="5" placeholder="Paste text here"></textarea>
       <button id="sendClipboardBtn" type="button">Send to phone clipboard</button>
+      <label class="context-toggle" for="clipboardContextMenu">
+        <span>Show clipboard in right-click menu</span>
+        <input id="clipboardContextMenu" type="checkbox" role="switch" checked disabled />
+      </label>
       <p id="status" role="status" aria-live="polite"></p>
     </main>
     <script src="popup.js"></script>

@@ -10,7 +10,8 @@
     "128": "icons/icon128.png"
   },
   "permissions": [
-    "contextMenus"
+    "contextMenus",
+    "storage"
   ],
   "action": {
     "default_title": "Ringa",
