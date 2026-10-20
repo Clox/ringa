@@ -529,6 +529,23 @@ class AndroidMessageServer(
             if (requestType == "clipboard" && clipboardText == null) {
                 throw IllegalArgumentException("clipboard request missing clipboard_text payload")
             }
+            if (requestType == "clipboard_image") {
+                val mimeType = json.optString("image_mime_type", "")
+                val imageData = json.optString("image_data_b64", "")
+                if (imageData.isEmpty()) {
+                    throw IllegalArgumentException("clipboard image request missing image_data_b64")
+                }
+                val size = ImageClipboardProvider.copyToClipboard(context, mimeType, imageData)
+                onMessageLine(
+                    IncomingRequest(
+                        requestType = requestType,
+                        logLine = "[${nowString()}] $source: image clipboard updated ($size bytes, $mimeType)",
+                        dialNumber = null,
+                        clipboardText = null,
+                    ),
+                )
+                return jsonResponse(Response.Status.OK, """{"ok":true}""")
+            }
             if (requestType == "clipboard_fetch") {
                 val fetchResult = buildClipboardFetchResult()
                 onMessageLine(

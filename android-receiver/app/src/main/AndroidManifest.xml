@@ -32,6 +32,11 @@
             android:exported="false"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
+        <provider
+            android:name=".ImageClipboardProvider"
+            android:authorities="${applicationId}.images"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <receiver
             android:name=".BootReceiver"
             android:directBootAware="true"

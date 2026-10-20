@@ -7,6 +7,7 @@ const sendDialBtn = document.getElementById("sendDialBtn");
 const sendClipboardBtn = document.getElementById("sendClipboardBtn");
 const dialContextMenu = document.getElementById("dialContextMenu");
 const clipboardContextMenu = document.getElementById("clipboardContextMenu");
+const imageContextMenu = document.getElementById("imageContextMenu");
 
 function setStatus(text, ok) {
   statusEl.textContent = text;
@@ -103,12 +104,21 @@ async function loadContextMenuSettings() {
   try {
     const settings = await chrome.storage.local.get({
       dialContextMenu: true,
-      clipboardContextMenu: true
+      clipboardContextMenu: true,
+      imageContextMenu: true,
+      lastImageTransfer: null
     });
     dialContextMenu.checked = settings.dialContextMenu !== false;
     clipboardContextMenu.checked = settings.clipboardContextMenu !== false;
+    imageContextMenu.checked = settings.imageContextMenu !== false;
     dialContextMenu.disabled = false;
     clipboardContextMenu.disabled = false;
+    imageContextMenu.disabled = false;
+    if (settings.lastImageTransfer) {
+      setStatus(settings.lastImageTransfer.message, settings.lastImageTransfer.ok);
+      await chrome.action.setBadgeText({ text: "" });
+      await chrome.storage.local.remove("lastImageTransfer");
+    }
   } catch (error) {
     setStatus(`Could not load menu settings: ${error.message}`, false);
   }
@@ -132,6 +142,7 @@ sendDialBtn.addEventListener("click", sendDialRequest);
 sendClipboardBtn.addEventListener("click", sendClipboardRequest);
 dialContextMenu.addEventListener("change", saveContextMenuSetting);
 clipboardContextMenu.addEventListener("change", saveContextMenuSetting);
+imageContextMenu.addEventListener("change", saveContextMenuSetting);
 loadContextMenuSettings();
 
 phoneInput.addEventListener("keydown", (event) => {

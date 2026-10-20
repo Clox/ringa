@@ -2,7 +2,7 @@
 
 This repo contains three pieces:
 
-- `chrome-extension/`: Chrome extension that sends dial requests and selected text to the phone clipboard.
+- `chrome-extension/`: Chrome extension that sends dial requests, selected text, and images to the phone clipboard.
 - `terminal-host/`: Python terminal app that receives browser messages and forwards them.
 - `android-receiver/`: Android app that runs a foreground listener service on LAN, displays events, and advertises itself via mDNS.
 
@@ -73,9 +73,11 @@ python3 terminal-host/server.py \
 3. You can also highlight a phone number in a web page, right-click, and choose `Dial via Ringa`.
 4. To send selected text to the phone clipboard, right-click the selection and choose `Send selection to phone clipboard`.
 5. To send other text, click the extension icon, paste the text into `Text for phone clipboard`, and click `Send to phone clipboard`.
+6. To copy an image to the phone, right-click the image and choose `Send image to phone clipboard`. Chrome asks for access to that image's site on first use. Open the Ringa popup to see whether the transfer succeeded.
 
-Chrome groups the right-click actions under a `Ringa` submenu when both are enabled. With only one enabled, that action appears directly in the right-click menu. After updating the unpacked extension, click its reload button on `chrome://extensions`; restarting Chrome is not required.
+Chrome groups the two text-selection actions under a `Ringa` submenu when both are enabled. With only one enabled, that action appears directly in the right-click menu. The image action appears when right-clicking an image. After updating the unpacked extension, click its reload button on `chrome://extensions`; restarting Chrome is not required.
 The popup has a separate switch for each action. Turn a switch off to hide that action from the right-click menu, or on to show it again. The setting is saved locally and takes effect immediately; the popup buttons remain available.
+Image copying supports PNG, JPEG, GIF, and WebP images up to 4 MB from HTTP, HTTPS, or data URLs. Blob URLs and images that require access Chrome cannot grant are not supported. The Android receiver must be updated to use the image clipboard feature.
 
 You will see:
 

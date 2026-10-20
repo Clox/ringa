@@ -25,7 +25,7 @@ def now_iso() -> str:
 def redact_clipboard_value(key: str, value: Any) -> str:
     if not isinstance(value, str):
         return "<redacted>"
-    if key == "clipboard_text_b64":
+    if key in {"clipboard_text_b64", "image_data_b64"}:
         return f"<base64 {len(value)} chars redacted>"
     return f"<{len(value)} chars redacted>"
 
@@ -34,7 +34,7 @@ def sanitize_payload_for_log(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: Dict[str, Any] = {}
         for key, nested_value in value.items():
-            if key in {"clipboard_text", "clipboard_text_b64"}:
+            if key in {"clipboard_text", "clipboard_text_b64", "image_data_b64"}:
                 sanitized[key] = redact_clipboard_value(key, nested_value)
             else:
                 sanitized[key] = sanitize_payload_for_log(nested_value)
@@ -213,6 +213,10 @@ class MessageHandler(BaseHTTPRequestHandler):
             return
 
         content_length = int(self.headers.get("Content-Length", "0"))
+        if content_length > 8 * 1024 * 1024:
+            self._set_headers(413)
+            self.wfile.write(b'{"ok":false,"error":"payload too large"}')
+            return
         body = self.rfile.read(content_length)
 
         try:
@@ -241,7 +245,7 @@ class MessageHandler(BaseHTTPRequestHandler):
             {
                 "ok": True,
                 "received_at": now_iso(),
-                "echo": payload,
+                "echo": sanitize_payload_for_log(payload),
                 "forwarded": (forward_result.ok if forward_result is not None else None),
                 "forward_detail": (forward_result.detail if forward_result is not None else None),
             },
@@ -283,7 +287,11 @@ class MessageHandler(BaseHTTPRequestHandler):
             forwarded_payload["source"] = "terminal-host"
         forwarded_payload["forwarded_by"] = "terminal-host"
         forwarded_payload["forwarded_at"] = now_iso()
-        forwarded_payload["browser_payload"] = payload
+        forwarded_payload["browser_payload"] = (
+            {key: value for key, value in payload.items() if key != "image_data_b64"}
+            if payload.get("request_type") == "clipboard_image"
+            else payload
+        )
 
         send_result = self._send_forward_payload(target_url, forwarded_payload)
         if send_result.ok:

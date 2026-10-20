@@ -20,8 +20,12 @@
       <textarea id="clipboardText" rows="5" placeholder="Paste text here"></textarea>
       <button id="sendClipboardBtn" type="button">Send to phone clipboard</button>
       <label class="context-toggle" for="clipboardContextMenu">
-        <span>Show clipboard in right-click menu</span>
+        <span>Show selected text in right-click menu</span>
         <input id="clipboardContextMenu" type="checkbox" role="switch" checked disabled />
+      </label>
+      <label class="context-toggle" for="imageContextMenu">
+        <span>Show image in right-click menu</span>
+        <input id="imageContextMenu" type="checkbox" role="switch" checked disabled />
       </label>
       <p id="status" role="status" aria-live="polite"></p>
     </main>
